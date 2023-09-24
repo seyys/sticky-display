@@ -8,7 +8,7 @@ builds:
       - arm
       - arm64
     ldflags:
-      - -s -w -X main.name=cortile -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+      - -s -w -X main.name=sticky-display -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
 changelog:
   sort: asc

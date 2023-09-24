@@ -7,9 +7,9 @@ import (
 	"github.com/BurntSushi/xgbutil/keybind"
 	"github.com/BurntSushi/xgbutil/xevent"
 
-	"github.com/leukipp/cortile/common"
-	"github.com/leukipp/cortile/desktop"
-	"github.com/leukipp/cortile/store"
+	"github.com/seyys/sticky-display/common"
+	"github.com/seyys/sticky-display/desktop"
+	"github.com/seyys/sticky-display/store"
 
 	log "github.com/sirupsen/logrus"
 )

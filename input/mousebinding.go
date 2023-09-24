@@ -3,12 +3,8 @@ package input
 import (
 	"time"
 
-	"github.com/leukipp/cortile/common"
-	"github.com/leukipp/cortile/desktop"
-	"github.com/leukipp/cortile/store"
-	"github.com/leukipp/cortile/ui"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/seyys/sticky-display/desktop"
+	"github.com/seyys/sticky-display/store"
 )
 
 var (
@@ -22,23 +18,7 @@ func BindMouse(tr *desktop.Tracker) {
 		// Update systray icon
 		ws := tr.ActiveWorkspace()
 		if ws != workspace {
-			ui.UpdateIcon(ws)
 			workspace = ws
-		}
-
-		// Evaluate corner states
-		for i := range store.Corners {
-			hc := store.Corners[i]
-
-			wasActive := hc.Active
-			isActive := hc.IsActive(store.CurrentPointer)
-
-			if !wasActive && isActive {
-				log.Debug("Corner at position ", hc.Area, " is hot [", hc.Name, "]")
-				Execute(common.Config.Corners[hc.Name], "current", tr)
-			} else if wasActive && !isActive {
-				log.Debug("Corner at position ", hc.Area, " is cold [", hc.Name, "]")
-			}
 		}
 	})
 }

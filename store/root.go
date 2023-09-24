@@ -3,6 +3,8 @@ package store
 import (
 	"time"
 
+	"github.com/seyys/sticky-display/common"
+
 	"github.com/BurntSushi/xgb/xproto"
 	"github.com/BurntSushi/xgbutil"
 	"github.com/BurntSushi/xgbutil/ewmh"
@@ -11,14 +13,12 @@ import (
 	"github.com/BurntSushi/xgbutil/xprop"
 	"github.com/BurntSushi/xgbutil/xrect"
 	"github.com/BurntSushi/xgbutil/xwindow"
-	"github.com/leukipp/cortile/common"
 
 	log "github.com/sirupsen/logrus"
 )
 
 var (
 	X              *xgbutil.XUtil  // X connection object
-	DeskCount      uint            // Number of desktops
 	ScreenCount    uint            // Number of screens
 	CurrentDesk    uint            // Current desktop number
 	CurrentScreen  uint            // Current screen number
@@ -26,7 +26,6 @@ var (
 	ActiveWindow   xproto.Window   // Current active window
 	Windows        []xproto.Window // List of client windows
 	ViewPorts      Head            // Physical connected monitors
-	Corners        []*Corner       // Corners for pointer events
 )
 
 var (
@@ -45,12 +44,10 @@ func InitRoot() {
 	X = Connect()
 
 	// Init root properties
-	DeskCount = NumberOfDesktopsGet(X)
 	CurrentDesk = CurrentDesktopGet(X)
 	ActiveWindow = ActiveWindowGet(X)
 	Windows = ClientListStackingGet(X)
 	ViewPorts = ViewPortsGet(X)
-	Corners = CreateCorners()
 
 	// Attach root events
 	root := xwindow.New(X, X.RootWin())
@@ -91,18 +88,6 @@ func Connect() *xgbutil.XUtil {
 	log.Info("Connected to X server [", wm, "]")
 
 	return X
-}
-
-func NumberOfDesktopsGet(X *xgbutil.XUtil) uint {
-	deskCount, err := ewmh.NumberOfDesktopsGet(X)
-
-	// Validate number of desktops
-	if err != nil {
-		log.Error("Error retrieving number of desktops ", err)
-		return DeskCount
-	}
-
-	return deskCount
 }
 
 func CurrentDesktopGet(X *xgbutil.XUtil) uint {
@@ -231,12 +216,6 @@ func DesktopDimensions(screenNum uint) (x, y, w, h int) {
 	// Get desktop dimensions
 	x, y, w, h = ViewPorts.Desktops[screenNum].Pieces()
 
-	// Add desktop margin
-	x += common.Config.EdgeMargin[3]
-	y += common.Config.EdgeMargin[0]
-	w -= common.Config.EdgeMargin[1] + common.Config.EdgeMargin[3]
-	h -= common.Config.EdgeMargin[2] + common.Config.EdgeMargin[0]
-
 	return
 }
 
@@ -266,15 +245,11 @@ func StateUpdate(X *xgbutil.XUtil, e xevent.PropertyNotifyEvent) {
 	}
 
 	// Update common state variables
-	if common.IsInList(aname, []string{"_NET_NUMBER_OF_DESKTOPS"}) {
-		DeskCount = NumberOfDesktopsGet(X)
-		stateCallbacks(aname)
-	} else if common.IsInList(aname, []string{"_NET_CURRENT_DESKTOP"}) {
+	if common.IsInList(aname, []string{"_NET_CURRENT_DESKTOP"}) {
 		CurrentDesk = CurrentDesktopGet(X)
 		stateCallbacks(aname)
 	} else if common.IsInList(aname, []string{"_NET_DESKTOP_LAYOUT", "_NET_DESKTOP_GEOMETRY", "_NET_DESKTOP_VIEWPORT", "_NET_WORKAREA"}) {
 		ViewPorts = ViewPortsGet(X)
-		Corners = CreateCorners()
 		stateCallbacks(aname)
 	} else if common.IsInList(aname, []string{"_NET_CLIENT_LIST_STACKING"}) {
 		Windows = ClientListStackingGet(X)

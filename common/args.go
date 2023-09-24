@@ -19,13 +19,14 @@ type BuildInfo struct {
 }
 
 type Arguments struct {
-	Config string // Argument for config file path
-	Lock   string // Argument for lock file path
-	Sock   string // Argument for sock file path
-	Log    string // Argument for log file path
-	VVV    bool   // Argument for very very verbose mode
-	VV     bool   // Argument for very verbose mode
-	V      bool   // Argument for verbose mode
+	Config       string // Argument for config file path
+	PrintDisplay bool   // Print the number of the current display
+	Lock         string // Argument for lock file path
+	Sock         string // Argument for sock file path
+	Log          string // Argument for log file path
+	VVV          bool   // Argument for very very verbose mode
+	VV           bool   // Argument for very verbose mode
+	V            bool   // Argument for verbose mode
 }
 
 func InitArgs(name, version, commit, date string) {
@@ -41,6 +42,7 @@ func InitArgs(name, version, commit, date string) {
 
 	// Command line arguments
 	flag.StringVar(&Args.Config, "config", ConfigFilePath(Build.Name), "config file path")
+	flag.BoolVar(&Args.PrintDisplay, "print-display", false, "number of current display")
 	flag.StringVar(&Args.Lock, "lock", fmt.Sprintf("/tmp/%s.lock", Build.Name), "lock file path")
 	flag.StringVar(&Args.Sock, "sock", fmt.Sprintf("/tmp/%s.sock", Build.Name), "sock file path")
 	flag.StringVar(&Args.Log, "log", fmt.Sprintf("/tmp/%s.log", Build.Name), "log file path")

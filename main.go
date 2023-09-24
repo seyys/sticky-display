@@ -11,21 +11,20 @@ import (
 
 	"github.com/BurntSushi/xgbutil/xevent"
 
-	"github.com/leukipp/cortile/common"
-	"github.com/leukipp/cortile/desktop"
-	"github.com/leukipp/cortile/input"
-	"github.com/leukipp/cortile/store"
-	"github.com/leukipp/cortile/ui"
+	"github.com/seyys/sticky-display/common"
+	"github.com/seyys/sticky-display/desktop"
+	"github.com/seyys/sticky-display/input"
+	"github.com/seyys/sticky-display/store"
 
 	log "github.com/sirupsen/logrus"
 )
 
 var (
 	// Build name
-	name = "cortile"
+	name = "sticky-display"
 
 	// Build version
-	version = "0.0.0"
+	version = "0.1"
 
 	// Build commit
 	commit = "local"
@@ -37,9 +36,6 @@ var (
 var (
 	//go:embed config.toml
 	toml []byte
-
-	//go:embed assets/images/logo.png
-	icon []byte
 )
 
 func main() {
@@ -48,7 +44,7 @@ func main() {
 	common.InitArgs(name, version, commit, date)
 
 	// Init embedded files
-	common.InitFiles(toml, icon)
+	common.InitFiles(toml)
 
 	// Init lock and log files
 	defer InitLock().Close()
@@ -58,11 +54,18 @@ func main() {
 	common.InitConfig()
 	store.InitRoot()
 
-	// Start main
-	start()
+	prepare()
+
+	if common.Args.PrintDisplay {
+		println("This is display", store.CurrentScreen)
+		return
+	}
+
+	// Run X event loop
+	xevent.Main(store.X)
 }
 
-func start() {
+func prepare() {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Fatal(fmt.Errorf("%s\n%s", err, debug.Stack()))
@@ -73,20 +76,11 @@ func start() {
 	workspaces := desktop.CreateWorkspaces()
 	tracker := desktop.CreateTracker(workspaces)
 
-	// Show initial layout
-	ws := tracker.ActiveWorkspace()
-	ui.ShowLayout(ws)
-	ui.UpdateIcon(ws)
-
 	// Bind input events
 	input.BindSignal(tracker)
 	input.BindSocket(tracker)
 	input.BindMouse(tracker)
 	input.BindKeys(tracker)
-	input.BindTray(tracker)
-
-	// Run X event loop
-	xevent.Main(store.X)
 }
 
 func InitLock() *os.File {

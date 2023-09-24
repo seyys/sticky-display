@@ -17,6 +17,15 @@ func Truncate(s string, max int) string {
 	return s[:max]
 }
 
+func IsInIntList(item int, items []int) bool {
+	for i := 0; i < len(items); i++ {
+		if items[i] == item {
+			return true
+		}
+	}
+	return false
+}
+
 func IsInList(item string, items []string) bool {
 	for i := 0; i < len(items); i++ {
 		if items[i] == item {

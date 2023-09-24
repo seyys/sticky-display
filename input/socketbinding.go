@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/leukipp/cortile/common"
-	"github.com/leukipp/cortile/desktop"
+	"github.com/seyys/sticky-display/common"
+	"github.com/seyys/sticky-display/desktop"
 
 	log "github.com/sirupsen/logrus"
 )

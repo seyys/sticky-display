@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/leukipp/cortile/desktop"
+	"github.com/seyys/sticky-display/desktop"
 )
 
 func BindSignal(tr *desktop.Tracker) {

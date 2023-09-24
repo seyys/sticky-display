@@ -1,7 +1,6 @@
 package store
 
 import (
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -14,7 +13,7 @@ import (
 	"github.com/BurntSushi/xgbutil/xrect"
 	"github.com/BurntSushi/xgbutil/xwindow"
 
-	"github.com/leukipp/cortile/common"
+	"github.com/seyys/sticky-display/common"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -22,7 +21,6 @@ import (
 type Client struct {
 	Win      *xwindow.Window `json:"-"` // X window object
 	Created  time.Time       // Internal client creation time
-	Locked   bool            // Internal client move/resize lock
 	Original *Info           // Original client window information
 	Latest   *Info           // Latest client window information
 }
@@ -55,7 +53,6 @@ func CreateClient(w xproto.Window) *Client {
 	c := &Client{
 		Win:      xwindow.New(X, w),
 		Created:  time.Now(),
-		Locked:   false,
 		Original: i,
 		Latest:   i,
 	}
@@ -70,50 +67,18 @@ func (c *Client) Activate() {
 	ewmh.ActiveWindowReq(X, c.Win.Id)
 }
 
-func (c *Client) Lock() {
-	c.Locked = true
-}
-
-func (c *Client) UnLock() {
-	c.Locked = false
-}
-
-func (c *Client) UnDecorate() {
-	if common.Config.WindowDecoration || !motif.Decor(&c.Latest.Dimensions.Hints.Motif) {
-		return
+func (c *Client) Pin() {
+	if common.IsInIntList(int(c.Latest.ScreenNum), common.Config.StickyDisplays) {
+		ewmh.WmStateReq(X, c.Win.Id, 1, "_NET_WM_STATE_STICKY")
 	}
-
-	// Remove window decorations
-	motif.WmHintsSet(X, c.Win.Id, &motif.Hints{
-		Flags:      motif.HintDecorations,
-		Decoration: motif.DecorationNone,
-	})
 }
 
-func (c *Client) UnMaximize() {
-
-	// Unmaximize window
-	for _, state := range c.Latest.States {
-		if strings.HasPrefix(state, "_NET_WM_STATE_MAXIMIZED") {
-			ewmh.WmStateReq(X, c.Win.Id, 0, "_NET_WM_STATE_MAXIMIZED_VERT")
-			ewmh.WmStateReq(X, c.Win.Id, 0, "_NET_WM_STATE_MAXIMIZED_HORZ")
-			break
-		}
-	}
+func (c *Client) UnPin() {
+	// TODO restore original sticky state
+	ewmh.WmStateReq(X, c.Win.Id, 0, "_NET_WM_STATE_STICKY")
 }
 
 func (c *Client) MoveResize(x, y, w, h int) {
-	if c.Locked {
-		log.Info("Reject window move/resize [", c.Latest.Class, "]")
-
-		// Remove lock
-		c.UnLock()
-		return
-	}
-
-	// Remove unwanted
-	c.UnDecorate()
-	c.UnMaximize()
 
 	// Calculate dimension offsets
 	ext := c.Latest.Dimensions.Extents
@@ -136,20 +101,6 @@ func (c *Client) MoveResize(x, y, w, h int) {
 	c.Update()
 }
 
-func (c *Client) LimitDimensions(w, h int) {
-
-	// Decoration extents
-	ext := c.Latest.Dimensions.Extents
-	dw, dh := ext.Left+ext.Right, ext.Top+ext.Bottom
-
-	// Set window size limits
-	icccm.WmNormalHintsSet(X, c.Win.Id, &icccm.NormalHints{
-		Flags:     icccm.SizeHintPMinSize,
-		MinWidth:  uint(w - dw),
-		MinHeight: uint(h - dh),
-	})
-}
-
 func (c *Client) Update() {
 	info := GetInfo(c.Win.Id)
 	if len(info.Class) == 0 {
@@ -163,71 +114,6 @@ func (c *Client) Update() {
 
 func (c *Client) Restore(original bool) {
 	c.Update()
-
-	// Obtain decoration motif
-	dw, dh := 0, 0
-	decoration := motif.DecorationNone
-	if motif.Decor(&c.Original.Dimensions.Hints.Motif) {
-		decoration = motif.DecorationAll
-
-		// Obtain decoration extents
-		if !common.Config.WindowDecoration {
-			ext := c.Original.Dimensions.Extents
-			dw, dh = ext.Left+ext.Right, ext.Top+ext.Bottom
-		}
-	}
-
-	// Obtain dimension adjustments
-	if c.Latest.Dimensions.AdjPos && c.Latest.Dimensions.AdjSize {
-		c.Latest.Dimensions.AdjPos = false
-		c.Latest.Dimensions.AdjSize = false
-	}
-
-	// Restore window decorations
-	motif.WmHintsSet(X, c.Win.Id, &motif.Hints{
-		Flags:      motif.HintDecorations,
-		Decoration: uint(decoration),
-	})
-
-	// Restore window size limits
-	icccm.WmNormalHintsSet(X, c.Win.Id, &c.Original.Dimensions.Hints.Normal)
-
-	// Move window to latest/original position considering decoration adjustments
-	geom := c.Latest.Dimensions.Geometry
-	if original {
-		geom = c.Original.Dimensions.Geometry
-	}
-	c.MoveResize(geom.X(), geom.Y(), geom.Width()-dw, geom.Height()-dh)
-}
-
-func (c *Client) OuterGeometry() (x, y, w, h int) {
-
-	// Outer window dimensions (x/y relative to workspace)
-	oGeom, err := c.Win.DecorGeometry()
-	if err != nil {
-		return
-	}
-
-	// Inner window dimensions (x/y relative to outer window)
-	iGeom, err := xwindow.RawGeometry(X, xproto.Drawable(c.Win.Id))
-	if err != nil {
-		return
-	}
-
-	// Reset inner window positions (some wm won't return x/y relative to outer window)
-	if reflect.DeepEqual(oGeom, iGeom) {
-		iGeom.XSet(0)
-		iGeom.YSet(0)
-	}
-
-	// Decoration extents (l/r/t/b relative to outer window dimensions)
-	ext := c.Latest.Dimensions.Extents
-	dx, dy, dw, dh := ext.Left, ext.Top, ext.Left+ext.Right, ext.Top+ext.Bottom
-
-	// Calculate outer geometry (including server and client decorations)
-	x, y, w, h = oGeom.X()+iGeom.X()-dx, oGeom.Y()+iGeom.Y()-dy, iGeom.Width()+dw, iGeom.Height()+dh
-
-	return
 }
 
 func IsSpecial(info *Info) bool {
@@ -257,22 +143,6 @@ func IsSpecial(info *Info) bool {
 	for _, typ := range info.Types {
 		if common.IsInList(typ, types) {
 			log.Info("Ignore window with type ", typ, " [", info.Class, "]")
-			return true
-		}
-	}
-
-	// Check window states
-	states := []string{
-		"_NET_WM_STATE_HIDDEN",
-		"_NET_WM_STATE_MODAL",
-		"_NET_WM_STATE_ABOVE",
-		"_NET_WM_STATE_BELOW",
-		"_NET_WM_STATE_SKIP_PAGER",
-		"_NET_WM_STATE_SKIP_TASKBAR",
-	}
-	for _, state := range info.States {
-		if common.IsInList(state, states) {
-			log.Info("Ignore window with state ", state, " [", info.Class, "]")
 			return true
 		}
 	}
@@ -344,11 +214,6 @@ func GetInfo(w xproto.Window) *Info {
 		name = class
 	}
 
-	// Window desktop and screen (window workspace location)
-	deskNum, err = ewmh.WmDesktopGet(X, w)
-	if err != nil || deskNum > DeskCount {
-		deskNum = CurrentDesktopGet(X)
-	}
 	screenNum = GetScreenNum(w)
 
 	// Window types (types of the window)

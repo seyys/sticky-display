@@ -1,9 +1,7 @@
 package desktop
 
 import (
-	"github.com/leukipp/cortile/common"
-	"github.com/leukipp/cortile/layout"
-	"github.com/leukipp/cortile/store"
+	"github.com/seyys/sticky-display/store"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -11,72 +9,41 @@ import (
 type Workspace struct {
 	Location        Location // Desktop and screen location
 	Layouts         []Layout // List of available layouts
-	TilingEnabled   bool     // Tiling is enabled or not
 	ActiveLayoutNum uint     // Active layout index
 }
 
 func CreateWorkspaces() map[Location]*Workspace {
 	workspaces := make(map[Location]*Workspace)
 
-	for deskNum := uint(0); deskNum < store.DeskCount; deskNum++ {
-		for screenNum := uint(0); screenNum < store.ScreenCount; screenNum++ {
-			location := Location{DeskNum: deskNum, ScreenNum: screenNum}
+	for screenNum := uint(0); screenNum < store.ScreenCount; screenNum++ {
+		location := Location{ScreenNum: screenNum}
 
-			// Create layouts for each desktop and screen
-			layouts := CreateLayouts(location)
-			ws := &Workspace{
-				Location:        location,
-				Layouts:         layouts,
-				TilingEnabled:   common.Config.TilingEnabled,
-				ActiveLayoutNum: 0,
-			}
-
-			// Activate default layout
-			for i, l := range layouts {
-				if l.GetName() == common.Config.TilingLayout {
-					ws.SetLayout(uint(i))
-				}
-			}
-
-			// Map location to workspace
-			workspaces[location] = ws
+		// Create layouts for each desktop and screen
+		ws := &Workspace{
+			Location:        location,
+			ActiveLayoutNum: 0,
 		}
+
+		// Map location to workspace
+		workspaces[location] = ws
 	}
 
 	return workspaces
-}
-
-func CreateLayouts(l Location) []Layout {
-	return []Layout{
-		layout.CreateFullscreenLayout(l.DeskNum, l.ScreenNum),
-		layout.CreateVerticalLeftLayout(l.DeskNum, l.ScreenNum),
-		layout.CreateVerticalRightLayout(l.DeskNum, l.ScreenNum),
-		layout.CreateHorizontalTopLayout(l.DeskNum, l.ScreenNum),
-		layout.CreateHorizontalBottomLayout(l.DeskNum, l.ScreenNum),
-	}
-}
-
-func (ws *Workspace) SetLayout(layoutNum uint) {
-	ws.ActiveLayoutNum = layoutNum
 }
 
 func (ws *Workspace) ActiveLayout() Layout {
 	return ws.Layouts[ws.ActiveLayoutNum]
 }
 
-func (ws *Workspace) CycleLayout(step int) {
-	if ws.Disabled() {
-		return
-	}
+func (ws *Workspace) Restore(original bool) {
+	mg := ws.ActiveLayout().GetManager()
 
-	// Calculate cycle direction
-	i := (int(ws.ActiveLayoutNum) + step) % len(ws.Layouts)
-	if i < 0 {
-		i = len(ws.Layouts) - 1
-	}
+	log.Info("Untile ", len(mg.Clients), " windows [workspace-", mg.DeskNum, "-", mg.ScreenNum, "]")
 
-	ws.SetLayout(uint(i))
-	ws.Tile()
+	// Restore client dimensions
+	for _, c := range mg.Clients {
+		c.Restore(original)
+	}
 }
 
 func (ws *Workspace) AddClient(c *store.Client) {
@@ -95,47 +62,4 @@ func (ws *Workspace) RemoveClient(c *store.Client) {
 	for _, l := range ws.Layouts {
 		l.RemoveClient(c)
 	}
-}
-
-func (ws *Workspace) Tile() {
-	if ws.Disabled() {
-		return
-	}
-
-	// Apply active layout
-	ws.ActiveLayout().Apply()
-}
-
-func (ws *Workspace) Restore(original bool) {
-	mg := ws.ActiveLayout().GetManager()
-	clients := mg.Clients(true)
-
-	log.Info("Untile ", len(clients), " windows [workspace-", mg.DeskNum, "-", mg.ScreenNum, "]")
-
-	// Restore client dimensions
-	for _, c := range clients {
-		c.Restore(original)
-	}
-}
-
-func (ws *Workspace) Enable() {
-	ws.TilingEnabled = true
-}
-
-func (ws *Workspace) Disable() {
-	ws.TilingEnabled = false
-}
-
-func (ws *Workspace) Enabled() bool {
-	if ws == nil {
-		return false
-	}
-	return ws.TilingEnabled
-}
-
-func (ws *Workspace) Disabled() bool {
-	if ws == nil {
-		return false
-	}
-	return !ws.TilingEnabled
 }

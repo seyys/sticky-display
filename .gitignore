@@ -1,3 +1,5 @@
 .assets
 dist
 sticky-display
+*.pkg.tar.zst
+pkg

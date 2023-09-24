@@ -1,4 +1,3 @@
-# Maintainer: Mert Ersoy <mertmit99@gmail.com>
 pkgname='sticky-display'
 _pkgname=${pkgname%-git}
 pkgver=0.1

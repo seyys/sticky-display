@@ -9,6 +9,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
+	github.com/dlclark/regexp2 v1.10.0
 )
 
 require (

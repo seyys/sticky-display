@@ -1,7 +1,6 @@
 package store
 
 import (
-	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/BurntSushi/xgbutil/xprop"
 	"github.com/BurntSushi/xgbutil/xrect"
 	"github.com/BurntSushi/xgbutil/xwindow"
+	"github.com/dlclark/regexp2"
 
 	"github.com/seyys/sticky-display/common"
 
@@ -157,16 +157,16 @@ func IsIgnored(info *Info) bool {
 		conf_class := s[0]
 		conf_name := s[1]
 
-		reg_class := regexp.MustCompile(strings.ToLower(conf_class))
-		reg_name := regexp.MustCompile(strings.ToLower(conf_name))
+		reg_class := regexp2.MustCompile(strings.ToLower(conf_class), regexp2.None)
+		reg_name := regexp2.MustCompile(strings.ToLower(conf_name), regexp2.None)
 
 		// Ignore all windows with this class
-		class_match := reg_class.MatchString(strings.ToLower(info.Class))
+		class_match, _ := reg_class.MatchString(strings.ToLower(info.Class))
 
 		// But allow the window with a special name
-		name_match := conf_name != "" && reg_name.MatchString(strings.ToLower(info.Name))
+		name_match, _ := reg_name.MatchString(strings.ToLower(info.Name))
 
-		if class_match && !name_match {
+		if class_match && conf_name != "" && !name_match {
 			log.Info("Ignore window with ", strings.TrimSpace(strings.Join(s, " ")), " from config [", info.Class, "]")
 			return true
 		}
